@@ -179,7 +179,7 @@ def analyze_manual():
                             "quantity": 1,
                             "unit_price": 0.0,
                             "total": 0.0,
-                            "product_type": "license|support|awb|ai_governance",
+                            "product_type": "coder_premium|awb|ai_governance|license|support",
                         }
                     ],
                     "payment_terms": "string (optional)",

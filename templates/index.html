@@ -904,7 +904,8 @@ const PO_COLORS = {
   license: '#4F46E5',
   support: '#10B981',
   awb: '#F59E0B',
-  ai_governance: '#8B5CF6'
+  ai_governance: '#8B5CF6',
+  coder_premium: '#4F46E5'
 };
 
 // ─── Tab Switching ────────────────────────────────────────
@@ -941,13 +942,14 @@ function addLineItem() {
   const tr = document.createElement('tr');
   tr.id = 'li-' + id;
   tr.innerHTML = `
-    <td data-label="Description"><input type="text" placeholder="e.g. Platform License" id="liDesc${id}"></td>
+    <td data-label="Description"><input type="text" placeholder="e.g. Coder Premium" id="liDesc${id}"></td>
     <td data-label="Product Type">
       <select id="liType${id}">
-        <option value="License">License</option>
-        <option value="Support">Support</option>
-        <option value="AWB - Agent Workspace Builds">AWB - Agent Workspace Builds</option>
-        <option value="AI Governance Add-on">AI Governance Add-on</option>
+        <option value="coder_premium">Coder Premium (License + Support)</option>
+        <option value="awb">Coder Premium - Agent Ready Workspaces (ARW)</option>
+        <option value="ai_governance">AI Governance Add-on</option>
+        <option value="license">License (standalone)</option>
+        <option value="support">Support (standalone)</option>
       </select>
     </td>
     <td data-label="Qty"><input type="number" min="1" value="1" id="liQty${id}" oninput="calcLineTotal(${id})"></td>

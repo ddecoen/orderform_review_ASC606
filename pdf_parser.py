@@ -21,6 +21,29 @@ from engine import LineItem, OrderForm, ProductType
 # ---------------------------------------------------------------------------
 
 _PRODUCT_TYPE_KEYWORDS: dict[str, list[str]] = {
+    ProductType.CODER_PREMIUM.value: [
+        "coder premium",
+        "coder enterprise",
+        "coder platform",
+        "coder subscription",
+    ],
+    ProductType.AWB.value: [
+        "agent ready workspace",
+        "agent-ready workspace",
+        "arw",
+        "agent workspace",
+        "awb",
+        "workspace build",
+        "agent build",
+        "agent workspace build",
+    ],
+    ProductType.AI_GOVERNANCE.value: [
+        "ai governance",
+        "governance license",
+        "governance add-on",
+        "ai governance license",
+        "ai gov",
+    ],
     ProductType.LICENSE.value: [
         "software license",
         "license fee",
@@ -39,31 +62,25 @@ _PRODUCT_TYPE_KEYWORDS: dict[str, list[str]] = {
         "technical support",
         "s&m",
     ],
-    ProductType.AWB.value: [
-        "agent workspace",
-        "awb",
-        "workspace build",
-        "agent build",
-        "agent workspace build",
-    ],
-    ProductType.AI_GOVERNANCE.value: [
-        "ai governance",
-        "governance license",
-        "governance add-on",
-        "ai governance license",
-        "ai gov",
-    ],
 }
 
 
 def _classify_product_type(description: str) -> str:
     """Classify a line item description into a ProductType."""
     desc_lower = description.lower()
+    
+    # Special case: "Coder Premium - Agent Ready Workspaces" is AWB, not coder_premium
+    if "agent ready" in desc_lower or "agent-ready" in desc_lower or "arw" in desc_lower:
+        return ProductType.AWB.value
+    
     for ptype, keywords in _PRODUCT_TYPE_KEYWORDS.items():
         for kw in keywords:
             if kw in desc_lower:
                 return ptype
-    # Default to license if unrecognized
+    # Default to coder_premium if "coder" appears anywhere
+    if "coder" in desc_lower:
+        return ProductType.CODER_PREMIUM.value
+    # Final fallback
     return ProductType.LICENSE.value
 
 
@@ -274,6 +291,8 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
         _find_date_in_text(text, "order date")
         or _find_date_in_text(text, "date")
         or _find_date_in_text(text, "effective date")
+        or _find_date_in_text(text, "execution date")
+        or _find_date_in_text(text, "signature date")
     )
     if not order_date:
         order_date = date.today().isoformat()
@@ -286,6 +305,9 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
         or _find_date_in_text(text, "start date")
         or _find_date_in_text(text, "effective date")
         or _find_date_in_text(text, "commencement")
+        or _find_date_in_text(text, "subscription start")
+        or _find_date_in_text(text, "term start")
+        or _find_date_in_text(text, "service start")
     )
     if not contract_start:
         contract_start = order_date
@@ -296,6 +318,9 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
         or _find_date_in_text(text, "end date")
         or _find_date_in_text(text, "expiration")
         or _find_date_in_text(text, "termination date")
+        or _find_date_in_text(text, "subscription end")
+        or _find_date_in_text(text, "term end")
+        or _find_date_in_text(text, "service end")
     )
     if not contract_end:
         # Default to 1 year from start
@@ -314,6 +339,10 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
         or _find_money_in_text(text, "grand total")
         or _find_money_in_text(text, "contract total")
         or _find_money_in_text(text, "total amount")
+        or _find_money_in_text(text, "total fees")
+        or _find_money_in_text(text, "total price")
+        or _find_money_in_text(text, "net amount")
+        or _find_money_in_text(text, "total due")
         or _find_money_in_text(text, "total")
     )
 

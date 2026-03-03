@@ -24,6 +24,7 @@ class ProductType(str, Enum):
     SUPPORT = "support"
     AWB = "awb"
     AI_GOVERNANCE = "ai_governance"
+    CODER_PREMIUM = "coder_premium"
 
 
 class RecognitionPattern(str, Enum):
@@ -117,6 +118,10 @@ class OrderForm:
         return any(
             li.product_type == ProductType.AI_GOVERNANCE.value for li in self.line_items
         )
+
+    @property
+    def has_coder_premium(self) -> bool:
+        return any(li.product_type == ProductType.CODER_PREMIUM.value for li in self.line_items)
 
 
 @dataclass
@@ -351,6 +356,51 @@ class ASC606Analyzer:
                     )
                 )
 
+            elif ptype == ProductType.CODER_PREMIUM.value:
+                # Coder Premium is a bundled product — decompose into
+                # License (20%) and Support (80%) performance obligations
+                license_amount = round(total * TRADITIONAL_LICENSE_SPLIT, 2)
+                support_amount = round(total - license_amount, 2)  # remainder to avoid rounding issues
+
+                obligations.append(
+                    PerformanceObligation(
+                        id=f"PO-{po_counter:03d}",
+                        description=f"Coder Premium — License ({combined_desc})",
+                        product_type=ProductType.LICENSE.value,
+                        is_distinct=True,
+                        recognition_pattern=RecognitionPattern.POINT_IN_TIME.value,
+                        asc_reference="ASC 606-10-25-14 through 25-22; ASC 606-10-55-54",
+                        rationale=(
+                            "Coder Premium includes a software license component that grants "
+                            "a right to use intellectual property as it exists at a point in time. "
+                            "The license is capable of being distinct and is separately identifiable. "
+                            "Allocated 20% of the Coder Premium line item total based on "
+                            "established SSP evidence (historical 20/80 split)."
+                        ),
+                        line_item_total=license_amount,
+                    )
+                )
+                po_counter += 1
+                obligations.append(
+                    PerformanceObligation(
+                        id=f"PO-{po_counter:03d}",
+                        description=f"Coder Premium — Support & Maintenance ({combined_desc})",
+                        product_type=ProductType.SUPPORT.value,
+                        is_distinct=True,
+                        recognition_pattern=RecognitionPattern.RATABLE.value,
+                        asc_reference="ASC 606-10-25-14 through 25-22; ASC 606-10-55-18",
+                        rationale=(
+                            "Coder Premium includes a support and maintenance component — "
+                            "a stand-ready obligation to provide updates, bug fixes, and technical "
+                            "support over the contract term. The customer simultaneously receives "
+                            "and consumes the benefits (ASC 606-10-25-27a). "
+                            "Allocated 80% of the Coder Premium line item total based on "
+                            "established SSP evidence (historical 20/80 split)."
+                        ),
+                        line_item_total=support_amount,
+                    )
+                )
+
         return obligations
 
     # ------------------------------------------------------------------
@@ -401,49 +451,46 @@ class ASC606Analyzer:
                     "point; this MUST be validated against the selected estimation approach.",
                 ])
 
-            elif (
-                po.product_type in (ProductType.LICENSE.value, ProductType.SUPPORT.value)
-                and order.is_traditional_deal
-                and not order.has_awb
-            ):
-                # Traditional deal: apply historical 20/80 split
-                if po.product_type == ProductType.LICENSE.value:
-                    # SSP proportion = 20% of the combined license+support total
+            elif po.product_type in (ProductType.LICENSE.value, ProductType.SUPPORT.value):
+                # Check if this PO came from Coder Premium decomposition
+                is_from_coder_premium = "Coder Premium" in po.description
+
+                if is_from_coder_premium:
+                    # Already split 20/80 during PO identification — use as-is
+                    ssp = po.line_item_total
+                    approach = SSPEstimationApproach.HISTORICAL.value
+                    warnings.append(
+                        "Coder Premium bundled product: SSP derived from established "
+                        "20% license / 80% support split applied during performance "
+                        "obligation identification."
+                    )
+                elif order.is_traditional_deal and not order.has_awb:
+                    # Traditional deal with separate license/support line items
                     trad_total = sum(
                         o.line_item_total
                         for o in obligations
                         if o.product_type
                         in (ProductType.LICENSE.value, ProductType.SUPPORT.value)
                     )
-                    ssp = round(trad_total * TRADITIONAL_LICENSE_SPLIT, 2)
+                    if po.product_type == ProductType.LICENSE.value:
+                        ssp = round(trad_total * TRADITIONAL_LICENSE_SPLIT, 2)
+                    else:
+                        ssp = round(trad_total * TRADITIONAL_SUPPORT_SPLIT, 2)
                     approach = SSPEstimationApproach.HISTORICAL.value
                     warnings.append(
                         "Using historical SSP split: 20% license / 80% support "
                         "for traditional deals (order date on or before 12/31/2025)."
                     )
                 else:
-                    trad_total = sum(
-                        o.line_item_total
-                        for o in obligations
-                        if o.product_type
-                        in (ProductType.LICENSE.value, ProductType.SUPPORT.value)
-                    )
-                    ssp = round(trad_total * TRADITIONAL_SUPPORT_SPLIT, 2)
+                    # Non-traditional or mixed deal — use contractual price as SSP
+                    ssp = po.line_item_total
                     approach = SSPEstimationApproach.HISTORICAL.value
-                    warnings.append(
-                        "Using historical SSP split: 20% license / 80% support "
-                        "for traditional deals (order date on or before 12/31/2025)."
-                    )
-            else:
-                # Non-traditional or mixed deal — use contractual price as SSP
-                ssp = po.line_item_total
-                approach = SSPEstimationApproach.HISTORICAL.value
-                if not order.is_traditional_deal:
-                    warnings.append(
-                        "Post-2025 deal: Historical 20/80 split may not apply. "
-                        "SSP set to contractual price — validate against current "
-                        "SSP evidence."
-                    )
+                    if not order.is_traditional_deal:
+                        warnings.append(
+                            "Post-2025 deal: Historical 20/80 split may not apply. "
+                            "SSP set to contractual price — validate against current "
+                            "SSP evidence."
+                        )
 
             raw_ssps.append((po, ssp, approach, warnings))
 
@@ -813,7 +860,7 @@ class ASC606Analyzer:
                 "action_required": True,
             })
 
-        if order.is_traditional_deal and not order.has_awb:
+        if order.is_traditional_deal and not order.has_awb and not order.has_coder_premium:
             flags.append({
                 "severity": "low",
                 "category": "SSP Method",
@@ -822,6 +869,19 @@ class ASC606Analyzer:
                     "split. Ensure this remains supported by current SSP evidence."
                 ),
                 "asc_reference": "ASC 606-10-32-33",
+                "action_required": False,
+            })
+
+        if order.has_coder_premium:
+            flags.append({
+                "severity": "low",
+                "category": "Bundled Product Decomposition",
+                "message": (
+                    "Coder Premium line item(s) automatically decomposed into separate "
+                    "License (20%) and Support (80%) performance obligations based on "
+                    "established SSP evidence."
+                ),
+                "asc_reference": "ASC 606-10-32-33 (SSP estimation — historical evidence)",
                 "action_required": False,
             })
 
@@ -863,6 +923,7 @@ class ASC606Analyzer:
                 ),
                 "has_awb": order.has_awb,
                 "has_ai_governance": order.has_ai_governance,
+                "has_coder_premium": order.has_coder_premium,
                 "payment_terms": order.payment_terms,
                 "renewal_terms": order.renewal_terms,
             },
