@@ -766,8 +766,16 @@
       <!-- Contract Details -->
       <div class="form-grid" style="margin-bottom: 1.5rem;">
         <div class="form-group">
-          <label for="customerName">Customer Name</label>
+          <label for="customerName">Account Name</label>
           <input type="text" id="customerName" placeholder="e.g. Acme Corp">
+        </div>
+        <div class="form-group">
+          <label for="contactName">Contact Name</label>
+          <input type="text" id="contactName" placeholder="e.g. Jane Smith">
+        </div>
+        <div class="form-group">
+          <label for="contactEmail">Contact Email</label>
+          <input type="email" id="contactEmail" placeholder="e.g. jane@acme.com">
         </div>
         <div class="form-group">
           <label for="orderDate">Order Date</label>
@@ -1043,13 +1051,15 @@ async function uploadPDF() {
 // ─── Submit Manual ────────────────────────────────────────
 async function submitManual() {
   const customer = document.getElementById('customerName').value.trim();
+  const contactName = document.getElementById('contactName').value.trim();
+  const contactEmail = document.getElementById('contactEmail').value.trim();
   const orderDate = document.getElementById('orderDate').value;
   const startDate = document.getElementById('startDate').value;
   const endDate = document.getElementById('endDate').value;
   const paymentTerms = document.getElementById('paymentTerms').value;
   const renewalTerms = document.getElementById('renewalTerms').value;
 
-  if (!customer) return showToast('Please enter a customer name.', true);
+  if (!customer) return showToast('Please enter an account name.', true);
   if (!startDate || !endDate) return showToast('Please enter contract start and end dates.', true);
 
   const lineItems = [];
@@ -1070,6 +1080,8 @@ async function submitManual() {
 
   const payload = {
     customer_name: customer,
+    contact_name: contactName,
+    contact_email: contactEmail,
     order_date: orderDate,
     contract_start: startDate,
     contract_end: endDate,
@@ -1115,7 +1127,9 @@ function renderResults(data) {
   const periodParts = contractPeriod.split(' to ');
   const contractStart = periodParts[0] || '—';
   const contractEnd = periodParts[1] || '—';
-  sg.innerHTML = summaryItem('Customer', s.customer_name || '—')
+  sg.innerHTML = summaryItem('Account Name', s.customer_name || '—')
+    + summaryItem('Contact', s.contact_name || '—')
+    + summaryItem('Email', s.contact_email || '—')
     + summaryItem('Order Date', s.order_date || '—')
     + summaryItem('Contract Start', contractStart)
     + summaryItem('Contract End', contractEnd)

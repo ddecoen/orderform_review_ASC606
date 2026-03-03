@@ -99,6 +99,8 @@ def upload_pdf():
             response["analysis"] = analysis
             response["parsed_order"] = {
                 "customer_name": order.customer_name,
+                "contact_name": order.contact_name,
+                "contact_email": order.contact_email,
                 "order_date": order.order_date,
                 "contract_start": order.contract_start,
                 "contract_end": order.contract_end,
@@ -115,6 +117,8 @@ def upload_pdf():
                 ],
                 "payment_terms": order.payment_terms,
                 "renewal_terms": order.renewal_terms,
+                "contact_name": order.contact_name,
+                "contact_email": order.contact_email,
             }
         else:
             response["analysis"] = None
@@ -247,6 +251,8 @@ def analyze_manual():
                 line_items=line_items,
                 payment_terms=data.get("payment_terms", ""),
                 renewal_terms=data.get("renewal_terms", ""),
+                contact_name=data.get("contact_name", ""),
+                contact_email=data.get("contact_email", ""),
             )
         except ValueError as ve:
             return jsonify({

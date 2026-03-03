@@ -245,8 +245,9 @@ def _extract_line_items_from_text(text: str) -> list[LineItem]:
 # ---------------------------------------------------------------------------
 
 def _extract_customer_name(text: str) -> str:
-    """Try to extract customer name from the text."""
+    """Try to extract customer/account name from the text."""
     patterns = [
+        r"(?:account\s*name)\s*[:\-]?\s*(.+)",
         r"(?:customer|client|bill\s*to|sold\s*to|company)\s*(?:name)?\s*[:\-]?\s*(.+)",
         r"(?:prepared\s+for|order\s+for)\s*[:\-]?\s*(.+)",
     ]
@@ -260,6 +261,43 @@ def _extract_customer_name(text: str) -> str:
             if len(name) > 2:
                 return name
     return "Unknown Customer"
+
+
+def _extract_contact_name(text: str) -> str:
+    """Try to extract the contact name from the text."""
+    # Match 'Name:' but avoid 'Account Name:', 'Customer Name:', etc.
+    patterns = [
+        r"(?:contact\s*name)\s*[:\-]?\s*(.+)",
+        r"(?:^|\n)\s*name\s*[:\-]\s*(.+)",
+        r"(?:prepared\s+by|submitted\s+by|ordered\s+by)\s*[:\-]?\s*(.+)",
+    ]
+    for pat in patterns:
+        match = re.search(pat, text, re.IGNORECASE)
+        if match:
+            name = match.group(1).strip().split("\n")[0].strip()
+            # Filter out things that look like non-names
+            if len(name) > 2 and not re.match(r'^[\d$]', name):
+                return name
+    return ""
+
+
+def _extract_email(text: str) -> str:
+    """Try to extract an email address near a label, or the first email found."""
+    # Labelled email
+    labelled = re.search(
+        r"(?:e-?mail)\s*[:\-]?\s*([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})",
+        text, re.IGNORECASE
+    )
+    if labelled:
+        return labelled.group(1).strip()
+    # Fallback: first email in document
+    fallback = re.search(
+        r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}",
+        text
+    )
+    if fallback:
+        return fallback.group(0).strip()
+    return ""
 
 
 def _extract_text_field(text: str, label: str) -> str:
@@ -281,10 +319,20 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
     """
     parse_warnings: list[str] = []
 
-    # Customer
+    # Customer (Account Name)
     customer_name = _extract_customer_name(text)
     if customer_name == "Unknown Customer":
-        parse_warnings.append("Could not identify customer name — flagged for manual entry.")
+        parse_warnings.append("Could not identify account name — flagged for manual entry.")
+
+    # Contact name
+    contact_name = _extract_contact_name(text)
+    if not contact_name:
+        parse_warnings.append("Could not identify contact name from order form.")
+
+    # Contact email
+    contact_email = _extract_email(text)
+    if not contact_email:
+        parse_warnings.append("Could not identify contact email from order form.")
 
     # Dates
     order_date = (
@@ -382,6 +430,8 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
             line_items=line_items,
             payment_terms=payment_terms,
             renewal_terms=renewal_terms,
+            contact_name=contact_name,
+            contact_email=contact_email,
         )
         return order, parse_warnings
     except Exception as exc:

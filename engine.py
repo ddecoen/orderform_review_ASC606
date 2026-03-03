@@ -72,7 +72,7 @@ class LineItem:
 
 @dataclass
 class OrderForm:
-    customer_name: str
+    customer_name: str  # Account Name from order form
     order_date: str  # ISO format YYYY-MM-DD
     contract_start: str
     contract_end: str
@@ -80,6 +80,8 @@ class OrderForm:
     line_items: list[LineItem] = field(default_factory=list)
     payment_terms: str = ""
     renewal_terms: str = ""
+    contact_name: str = ""  # Contact name from order form
+    contact_email: str = ""  # Contact email from order form
 
     def __post_init__(self) -> None:
         self.total_contract_value = round(float(self.total_contract_value), 2)
@@ -712,7 +714,7 @@ class ASC606Analyzer:
             {
                 "criterion": "Parties have approved the contract (ASC 606-10-25-1a)",
                 "status": "pass" if order.customer_name else "needs_review",
-                "detail": f"Customer: {order.customer_name}; Order date: {order.order_date}",
+                "detail": f"Account: {order.customer_name}; Contact: {order.contact_name or 'N/A'}; Order date: {order.order_date}",
             },
             {
                 "criterion": "Rights of each party are identifiable (ASC 606-10-25-1b)",
@@ -911,6 +913,8 @@ class ASC606Analyzer:
         return {
             "summary": {
                 "customer_name": order.customer_name,
+                "contact_name": order.contact_name,
+                "contact_email": order.contact_email,
                 "order_date": order.order_date,
                 "contract_period": f"{order.contract_start} to {order.contract_end}",
                 "contract_months": order.contract_months,
