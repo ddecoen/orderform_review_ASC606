@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASC 606 Revenue Recognition Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #1a1f36;
+    --navy-light: #2d3352;
+    --navy-dark: #131729;
+    --bg: #f7f8fc;
+    --white: #ffffff;
+    --gray-50: #fafbfe;
+    --gray-100: #f1f3f9;
+    --gray-200: #e2e5ef;
+    --gray-300: #c8cdd9;
+    --gray-400: #9aa0b4;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --indigo: #4F46E5;
+    --indigo-light: #6366f1;
+    --green: #10B981;
+    --green-light: #34d399;
+    --amber: #F59E0B;
+    --amber-light: #fbbf24;
+    --purple: #8B5CF6;
+    --purple-light: #a78bfa;
+    --red: #EF4444;
+    --red-light: #fca5a5;
+    --blue-info: #3B82F6;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--gray-700);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+    color: var(--white);
+    padding: 2rem 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(79,70,229,0.12) 0%, transparent 50%),
+                radial-gradient(circle at 70% 50%, rgba(139,92,246,0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .header-content { position: relative; z-index: 1; }
+  .header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 0.375rem;
+  }
+  .header .subtitle {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: rgba(255,255,255,0.65);
+    letter-spacing: 0.04em;
+  }
+  .header .subtitle span {
+    display: inline-block;
+    padding: 0 0.5rem;
+  }
+  .header .subtitle span:not(:last-child) {
+    border-right: 1px solid rgba(255,255,255,0.2);
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--gray-200);
+  }
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .card-title .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    border-bottom: 2px solid var(--gray-200);
+  }
+  .tab-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--gray-400);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--gray-600); }
+  .tab-btn.active {
+    color: var(--indigo);
+    border-bottom-color: var(--indigo);
+  }
+  .tab-content { display: none; padding-top: 1.5rem; }
+  .tab-content.active { display: block; }
+
+  /* ── Form Elements ── */
+  label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--gray-600);
+    margin-bottom: 0.375rem;
+  }
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  select {
+    width: 100%;
+    padding: 0.5625rem 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    background: var(--white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  input:focus, select:focus {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+  }
+  input::placeholder { color: var(--gray-300); }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .form-group { margin-bottom: 0; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--indigo);
+    color: var(--white);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--indigo-light);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+  .btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-600);
+    border: 1px solid var(--gray-200);
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--gray-200); }
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8rem;
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.08); }
+  .btn-sm { padding: 0.375rem 0.875rem; font-size: 0.8125rem; }
+
+  /* ── Dropzone ── */
+  .dropzone {
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-lg);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--gray-50);
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--indigo);
+    background: rgba(79,70,229,0.03);
+  }
+  .dropzone .drop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+  }
+  .dropzone .drop-text {
+    font-size: 0.95rem;
+    color: var(--gray-500);
+    margin-bottom: 0.25rem;
+  }
+  .dropzone .drop-hint {
+    font-size: 0.8rem;
+    color: var(--gray-400);
+  }
+  .dropzone .file-name {
+    margin-top: 0.75rem;
+    font-weight: 600;
+    color: var(--indigo);
+    font-size: 0.875rem;
+    display: none;
+  }
+  .dropzone .file-name.visible { display: block; }
+  #fileInput { display: none; }
+
+  /* ── Line Items Table ── */
+  .line-items-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .line-items-header h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--navy);
+  }
+  .line-items-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.85rem;
+  }
+  .line-items-table thead th {
+    background: var(--gray-100);
+    padding: 0.5rem 0.625rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .line-items-table thead th:first-child { border-radius: var(--radius) 0 0 0; }
+  .line-items-table thead th:last-child { border-radius: 0 var(--radius) 0 0; }
+  .line-items-table td {
+    padding: 0.5rem 0.375rem;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: middle;
+  }
+  .line-items-table td input,
+  .line-items-table td select {
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.5rem;
+  }
+  .line-items-table .total-cell {
+    font-weight: 600;
+    color: var(--navy);
+    text-align: right;
+    padding-right: 0.75rem;
+    min-width: 100px;
+  }
+  .running-total {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 2px solid var(--gray-200);
+  }
+  .running-total .label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .running-total .amount {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(26,31,54,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(2px);
+  }
+  .loading-overlay.active { display: flex; }
+  .loading-box {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 2rem 3rem;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--indigo);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-box p {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    font-weight: 500;
+  }
+
+  /* ── Results ── */
+  #results { display: none; }
+  #results.visible { display: block; }
+
+  .results-divider {
+    text-align: center;
+    margin: 2rem 0;
+    position: relative;
+  }
+  .results-divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--gray-200);
+  }
+  .results-divider span {
+    background: var(--bg);
+    padding: 0 1rem;
+    position: relative;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Contract Summary ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+  .summary-item {
+    padding: 0.75rem;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-100);
+  }
+  .summary-item .item-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+  .summary-item .item-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--navy);
+  }
+
+  /* ── Accordion ── */
+  .accordion-item {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+  .accordion-header {
+    width: 100%;
+    background: var(--gray-50);
+    border: none;
+    padding: 0.875rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: background 0.15s;
+  }
+  .accordion-header:hover { background: var(--gray-100); }
+  .accordion-header .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--indigo);
+    color: var(--white);
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .accordion-header .step-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--navy);
+    flex: 1;
+  }
+  .accordion-header .chevron {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    transition: transform 0.2s;
+  }
+  .accordion-item.open .accordion-header .chevron { transform: rotate(180deg); }
+  .accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .accordion-item.open .accordion-body { max-height: 3000px; }
+  .accordion-body-inner { padding: 1rem; }
+
+  /* ── Result Tables ── */
+  .result-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .result-table thead th {
+    background: var(--navy);
+    color: rgba(255,255,255,0.9);
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .result-table tbody tr { transition: background 0.1s; }
+  .result-table tbody tr:hover { background: var(--gray-50); }
+  .result-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .result-table tbody tr:last-child td { border-bottom: none; }
+  .result-table tfoot td {
+    padding: 0.625rem 0.75rem;
+    font-weight: 700;
+    background: var(--gray-50);
+    border-top: 2px solid var(--gray-200);
+    color: var(--navy);
+  }
+
+  /* ── Checklist ── */
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0;
+    font-size: 0.85rem;
+  }
+  .checklist-item .check {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .checklist-item .check.pass { background: #d1fae5; color: #065f46; }
+  .checklist-item .check.fail { background: #fee2e2; color: #991b1b; }
+
+  /* ── SSP Warning Banner ── */
+  .ssp-warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+  .ssp-warning .warn-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+  .ssp-warning .warn-text strong { color: var(--gray-700); }
+
+  /* ── Distinct Badge ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-yes { background: #d1fae5; color: #065f46; }
+  .badge-no { background: #fee2e2; color: #991b1b; }
+
+  /* ── Revenue Chart ── */
+  .chart-wrapper {
+    margin-top: 1.25rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-100);
+  }
+  .chart-wrapper h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 0.75rem;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    font-weight: 500;
+  }
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  #revenueCanvas {
+    width: 100% !important;
+    height: 280px !important;
+    display: block;
+  }
+
+  /* ── Alerts ── */
+  .alert {
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.625rem;
+    font-size: 0.8125rem;
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    line-height: 1.5;
+  }
+  .alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
+  .alert-warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+  }
+  .alert-error {
+    background: #fef2f2;
+    border: 1px solid var(--red-light);
+    color: #991b1b;
+  }
+  .alert-info {
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+  }
+  .alert .ref {
+    display: inline-block;
+    background: rgba(0,0,0,0.06);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 0.375rem;
+    white-space: nowrap;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--navy);
+    color: var(--white);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 2000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s;
+  }
+  .toast.visible { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--red); }
+
+  /* ── Schedule table scroll ── */
+  .schedule-scroll {
+    overflow-x: auto;
+    margin-top: 0.5rem;
+  }
+  .schedule-scroll .result-table { min-width: 700px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.35rem; }
+    .header .subtitle span { display: block; border-right: none !important; padding: 0.125rem 0; }
+    .form-grid { grid-template-columns: 1fr; }
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .container { padding: 1rem; }
+    .card { padding: 1rem; }
+    .line-items-table, .line-items-table thead, .line-items-table tbody,
+    .line-items-table th, .line-items-table td, .line-items-table tr {
+      display: block;
+    }
+    .line-items-table thead { display: none; }
+    .line-items-table tr {
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+    }
+    .line-items-table td {
+      padding: 0.25rem 0;
+      border: none;
+    }
+    .line-items-table td::before {
+      content: attr(data-label);
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 0.125rem;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <div class="header-content">
+    <h1>ASC 606 Revenue Recognition Analyzer</h1>
+    <p class="subtitle">
+      <span>Performance Obligations</span>
+      <span>SSP Allocation</span>
+      <span>Recognition Timing</span>
+    </p>
+  </div>
+</header>
+
+<!-- ═══════════ MAIN CONTENT ═══════════ -->
+<div class="container">
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="upload" onclick="switchTab('upload')">📄 PDF Upload</button>
+      <button class="tab-btn" data-tab="manual" onclick="switchTab('manual')">✏️ Manual Entry</button>
+    </div>
+
+    <!-- Tab 1: PDF Upload -->
+    <div id="tab-upload" class="tab-content active">
+      <div class="dropzone" id="dropzone"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)"
+           onclick="document.getElementById('fileInput').click()">
+        <div class="drop-icon">📋</div>
+        <p class="drop-text">Drag & drop your order form PDF here</p>
+        <p class="drop-hint">or click to browse files &nbsp;·&nbsp; PDF up to 10MB</p>
+        <p class="file-name" id="fileName"></p>
+        <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+      </div>
+      <div style="margin-top: 1.25rem; text-align: center;">
+        <button class="btn btn-primary" id="uploadBtn" onclick="uploadPDF()" disabled>
+          <span class="btn-text">Analyze Order Form</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Manual Entry -->
+    <div id="tab-manual" class="tab-content">
+      <!-- Contract Details -->
+      <div class="form-grid" style="margin-bottom: 1.5rem;">
+        <div class="form-group">
+          <label for="customerName">Customer Name</label>
+          <input type="text" id="customerName" placeholder="e.g. Acme Corp">
+        </div>
+        <div class="form-group">
+          <label for="orderDate">Order Date</label>
+          <input type="date" id="orderDate">
+        </div>
+        <div class="form-group">
+          <label for="startDate">Contract Start Date</label>
+          <input type="date" id="startDate">
+        </div>
+        <div class="form-group">
+          <label for="endDate">Contract End Date</label>
+          <input type="date" id="endDate">
+        </div>
+        <div class="form-group">
+          <label for="paymentTerms">Payment Terms</label>
+          <select id="paymentTerms">
+            <option value="">Select…</option>
+            <option value="Net 30">Net 30</option>
+            <option value="Net 45">Net 45</option>
+            <option value="Net 60">Net 60</option>
+            <option value="Annual Prepay">Annual Prepay</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="renewalTerms">Renewal Terms</label>
+          <select id="renewalTerms">
+            <option value="">Select…</option>
+            <option value="Auto-Renewal">Auto-Renewal</option>
+            <option value="Non-Renewal">Non-Renewal</option>
+            <option value="Co-Term">Co-Term</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Line Items -->
+      <div class="line-items-header">
+        <h3>Line Items</h3>
+        <button class="btn btn-secondary btn-sm" onclick="addLineItem()">+ Add Line Item</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="line-items-table" id="lineItemsTable">
+          <thead>
+            <tr>
+              <th style="min-width:180px;">Description</th>
+              <th style="min-width:160px;">Product Type</th>
+              <th style="width:80px;">Qty</th>
+              <th style="width:120px;">Unit Price</th>
+              <th style="width:110px;">Total</th>
+              <th style="width:50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="lineItemsBody">
+            <!-- rows added by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div class="running-total">
+        <span class="label">Total Contract Value</span>
+        <span class="amount" id="runningTotal">$0.00</span>
+      </div>
+
+      <div style="margin-top: 1.5rem; text-align: center;">
+        <button class="btn btn-primary" onclick="submitManual()">
+          Run ASC 606 Analysis
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ RESULTS ═══════════ -->
+  <div id="results">
+    <div class="results-divider"><span>Analysis Results</span></div>
+
+    <!-- Section 1: Contract Summary -->
+    <div class="card" id="summaryCard">
+      <div class="card-title">
+        <span class="icon" style="background:#eff6ff;color:#3b82f6;">📋</span>
+        Contract Summary
+      </div>
+      <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+
+    <!-- Section 2: Five-Step Checklist -->
+    <div class="card" id="stepsCard">
+      <div class="card-title">
+        <span class="icon" style="background:#f0fdf4;color:#16a34a;">✅</span>
+        ASC 606 Five-Step Model
+      </div>
+      <div id="accordionContainer"></div>
+    </div>
+
+    <!-- Section 3: Revenue Schedule -->
+    <div class="card" id="scheduleCard">
+      <div class="card-title">
+        <span class="icon" style="background:#faf5ff;color:#8b5cf6;">📊</span>
+        Revenue Recognition Schedule
+      </div>
+      <div class="schedule-scroll" id="scheduleTableContainer"></div>
+      <div class="chart-wrapper">
+        <h4>Monthly Recognized Revenue by Performance Obligation</h4>
+        <canvas id="revenueCanvas"></canvas>
+        <div class="chart-legend" id="chartLegend"></div>
+      </div>
+    </div>
+
+    <!-- Section 4: Warnings & Judgments -->
+    <div class="card" id="warningsCard">
+      <div class="card-title">
+        <span class="icon" style="background:#fffbeb;color:#d97706;">⚠️</span>
+        Warnings &amp; Key Judgments
+      </div>
+      <div id="warningsContainer"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ LOADING OVERLAY ═══════════ -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p id="loadingText">Analyzing contract…</p>
+  </div>
+</div>
+
+<!-- ═══════════ TOAST ═══════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+// ─── Globals ──────────────────────────────────────────────
+let selectedFile = null;
+let lineItemCounter = 0;
+const PO_COLORS = {
+  license: '#4F46E5',
+  support: '#10B981',
+  awb: '#F59E0B',
+  ai_governance: '#8B5CF6'
+};
+
+// ─── Tab Switching ────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+}
+
+// ─── Drag & Drop / File Select ────────────────────────────
+function handleDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('dragover'); }
+function handleDragLeave(e) { document.getElementById('dropzone').classList.remove('dragover'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length && files[0].type === 'application/pdf') setFile(files[0]);
+  else showToast('Please drop a PDF file.', true);
+}
+function handleFileSelect(e) {
+  if (e.target.files.length) setFile(e.target.files[0]);
+}
+function setFile(file) {
+  selectedFile = file;
+  const el = document.getElementById('fileName');
+  el.textContent = '📎 ' + file.name;
+  el.classList.add('visible');
+  document.getElementById('uploadBtn').disabled = false;
+}
+
+// ─── Line Items ───────────────────────────────────────────
+function addLineItem() {
+  lineItemCounter++;
+  const id = lineItemCounter;
+  const tr = document.createElement('tr');
+  tr.id = 'li-' + id;
+  tr.innerHTML = `
+    <td data-label="Description"><input type="text" placeholder="e.g. Platform License" id="liDesc${id}"></td>
+    <td data-label="Product Type">
+      <select id="liType${id}">
+        <option value="License">License</option>
+        <option value="Support">Support</option>
+        <option value="AWB - Agent Workspace Builds">AWB - Agent Workspace Builds</option>
+        <option value="AI Governance Add-on">AI Governance Add-on</option>
+      </select>
+    </td>
+    <td data-label="Qty"><input type="number" min="1" value="1" id="liQty${id}" oninput="calcLineTotal(${id})"></td>
+    <td data-label="Unit Price"><input type="number" min="0" step="0.01" placeholder="0.00" id="liPrice${id}" oninput="calcLineTotal(${id})"></td>
+    <td data-label="Total" class="total-cell" id="liTotal${id}">$0.00</td>
+    <td><button class="btn btn-danger" onclick="removeLineItem(${id})" title="Remove">✕</button></td>`;
+  document.getElementById('lineItemsBody').appendChild(tr);
+  calcRunningTotal();
+}
+function removeLineItem(id) {
+  const row = document.getElementById('li-' + id);
+  if (row) row.remove();
+  calcRunningTotal();
+}
+function calcLineTotal(id) {
+  const qty = parseFloat(document.getElementById('liQty' + id).value) || 0;
+  const price = parseFloat(document.getElementById('liPrice' + id).value) || 0;
+  document.getElementById('liTotal' + id).textContent = formatCurrency(qty * price);
+  calcRunningTotal();
+}
+function calcRunningTotal() {
+  let total = 0;
+  document.querySelectorAll('#lineItemsBody tr').forEach(tr => {
+    const id = tr.id.replace('li-', '');
+    const qty = parseFloat(document.getElementById('liQty' + id)?.value) || 0;
+    const price = parseFloat(document.getElementById('liPrice' + id)?.value) || 0;
+    total += qty * price;
+  });
+  document.getElementById('runningTotal').textContent = formatCurrency(total);
+}
+
+// Init with 2 empty rows
+addLineItem();
+addLineItem();
+
+// ─── Currency Formatter ───────────────────────────────────
+function formatCurrency(n) {
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ─── Toast ────────────────────────────────────────────────
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  requestAnimationFrame(() => t.classList.add('visible'));
+  setTimeout(() => t.classList.remove('visible'), 3500);
+}
+
+// ─── Loading ──────────────────────────────────────────────
+function showLoading(msg) {
+  document.getElementById('loadingText').textContent = msg || 'Analyzing contract…';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+// ─── Upload PDF ───────────────────────────────────────────
+async function uploadPDF() {
+  if (!selectedFile) return showToast('Please select a PDF file first.', true);
+  showLoading('Uploading and analyzing PDF…');
+  try {
+    const form = new FormData();
+    form.append('file', selectedFile);
+    const res = await fetch('/api/upload', { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.error || 'Upload failed (HTTP ' + res.status + ')');
+    }
+    // Show parse warnings if any
+    if (data.parse_warnings && data.parse_warnings.length) {
+      data.parse_warnings.forEach(w => showToast(w, true));
+    }
+    if (data.analysis) {
+      renderResults(data);
+      showToast('Analysis complete!');
+    } else if (data.needs_manual_entry) {
+      showToast('PDF could not be fully parsed. Please use manual entry.', true);
+      switchTab('manual');
+    } else {
+      showToast('No analysis returned. Please try manual entry.', true);
+    }
+  } catch (e) {
+    showToast(e.message, true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ─── Submit Manual ────────────────────────────────────────
+async function submitManual() {
+  const customer = document.getElementById('customerName').value.trim();
+  const orderDate = document.getElementById('orderDate').value;
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const paymentTerms = document.getElementById('paymentTerms').value;
+  const renewalTerms = document.getElementById('renewalTerms').value;
+
+  if (!customer) return showToast('Please enter a customer name.', true);
+  if (!startDate || !endDate) return showToast('Please enter contract start and end dates.', true);
+
+  const lineItems = [];
+  document.querySelectorAll('#lineItemsBody tr').forEach(tr => {
+    const id = tr.id.replace('li-', '');
+    const desc = document.getElementById('liDesc' + id)?.value?.trim() || '';
+    const type = document.getElementById('liType' + id)?.value || '';
+    const qty = parseFloat(document.getElementById('liQty' + id)?.value) || 0;
+    const unitPrice = parseFloat(document.getElementById('liPrice' + id)?.value) || 0;
+    if (desc && qty > 0 && unitPrice > 0) {
+      lineItems.push({ description: desc, product_type: type, quantity: qty, unit_price: unitPrice, total: qty * unitPrice });
+    }
+  });
+  if (!lineItems.length) return showToast('Please add at least one valid line item.', true);
+
+  let totalContractValue = 0;
+  lineItems.forEach(li => { totalContractValue += li.total; });
+
+  const payload = {
+    customer_name: customer,
+    order_date: orderDate,
+    contract_start: startDate,
+    contract_end: endDate,
+    payment_terms: paymentTerms,
+    renewal_terms: renewalTerms,
+    total_contract_value: totalContractValue,
+    line_items: lineItems
+  };
+
+  showLoading('Running ASC 606 analysis…');
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.error || 'Analysis failed (HTTP ' + res.status + ')');
+    }
+    renderResults(data);
+    showToast('Analysis complete!');
+  } catch (e) {
+    showToast(e.message, true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER RESULTS
+// ═══════════════════════════════════════════════════════════
+function renderResults(data) {
+  const r = document.getElementById('results');
+  r.classList.add('visible');
+
+  const analysis = data.analysis || {};
+
+  // ── 1. Contract Summary ──
+  const sg = document.getElementById('summaryGrid');
+  const s = analysis.summary || {};
+  const contractPeriod = s.contract_period || '';
+  const periodParts = contractPeriod.split(' to ');
+  const contractStart = periodParts[0] || '—';
+  const contractEnd = periodParts[1] || '—';
+  sg.innerHTML = summaryItem('Customer', s.customer_name || '—')
+    + summaryItem('Order Date', s.order_date || '—')
+    + summaryItem('Contract Start', contractStart)
+    + summaryItem('Contract End', contractEnd)
+    + summaryItem('Term Length', s.contract_months ? s.contract_months + ' months' : '—')
+    + summaryItem('TCV', formatCurrency(s.total_contract_value || 0))
+    + summaryItem('Deal Type', s.deal_type || '—')
+    + summaryItem('POs', s.num_performance_obligations != null ? String(s.num_performance_obligations) : '—')
+    + summaryItem('Payment Terms', s.payment_terms || '—')
+    + summaryItem('Renewal Terms', s.renewal_terms || '—');
+
+  // ── 2. Five Steps Accordion ──
+  const ac = document.getElementById('accordionContainer');
+  ac.innerHTML = '';
+  const steps = analysis.five_step_analysis || {};
+
+  // Step 1
+  ac.innerHTML += accordionItem(1, 'Identify the Contract', renderStep1(steps.step_1_identify_contract || {}));
+  // Step 2
+  ac.innerHTML += accordionItem(2, 'Identify Performance Obligations', renderStep2(steps.step_2_identify_obligations || {}));
+  // Step 3
+  ac.innerHTML += accordionItem(3, 'Determine Transaction Price', renderStep3(steps.step_3_transaction_price || {}));
+  // Step 4
+  ac.innerHTML += accordionItem(4, 'Allocate Transaction Price', renderStep4(steps.step_4_allocate_price || {}));
+  // Step 5
+  ac.innerHTML += accordionItem(5, 'Recognize Revenue', renderStep5(steps.step_5_recognize_revenue || {}));
+
+  // ── 3. Revenue Schedule ──
+  const schedules = (steps.step_5_recognize_revenue || {}).schedules || [];
+  const monthlyData = analysis.monthly_revenue_schedule || [];
+
+  const obligations = schedules.map(s => ({
+    name: s.description.split(' — ')[0] || s.description,
+    id: s.obligation_id,
+    color: PO_COLORS[s.product_type] || '#6b7280',
+    product_type: s.product_type
+  }));
+
+  const months = monthlyData.map(m => ({
+    label: m.month,
+    values: Object.fromEntries(obligations.map(o => [o.name, m[o.id] || 0]))
+  }));
+
+  const scheduleForRender = { months, obligations };
+  renderScheduleTable(scheduleForRender);
+  renderChart(scheduleForRender);
+
+  // ── 4. Warnings ──
+  renderWarnings(analysis.flags || []);
+
+  // Scroll to results
+  r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function summaryItem(label, value) {
+  return `<div class="summary-item"><div class="item-label">${esc(label)}</div><div class="item-value">${esc(value)}</div></div>`;
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function accordionItem(num, title, bodyHtml) {
+  return `<div class="accordion-item" id="step${num}">
+    <button class="accordion-header" onclick="toggleAccordion(${num})">
+      <span class="step-badge">${num}</span>
+      <span class="step-title">${esc(title)}</span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="accordion-body"><div class="accordion-body-inner">${bodyHtml}</div></div>
+  </div>`;
+}
+function toggleAccordion(num) {
+  document.getElementById('step' + num).classList.toggle('open');
+}
+
+// ─── Step 1: Contract Criteria Checklist ──────────────────
+function renderStep1(s1) {
+  const criteria = s1.criteria || [];
+  const ref = s1.asc_reference ? ` <span class="ref">${esc(s1.asc_reference)}</span>` : '';
+  let html = `<div style="margin-bottom:0.5rem;font-size:0.85rem;color:var(--gray-600);">Contract must meet all criteria under ASC 606-10-25-1:${ref}</div>`;
+  criteria.forEach(c => {
+    const pass = c.status === 'pass';
+    html += `<div class="checklist-item">
+      <span class="check ${pass ? 'pass' : 'fail'}">${pass ? '✓' : '✕'}</span>
+      <span>${esc(c.criterion || '')}</span>
+    </div>`;
+    if (c.detail) {
+      html += `<div style="margin-left:1.625rem;margin-bottom:0.25rem;font-size:0.78rem;color:var(--gray-400);">${esc(c.detail)}</div>`;
+    }
+  });
+  return html;
+}
+
+// ─── Step 2: Performance Obligations ──────────────────────
+function renderStep2(s2) {
+  const pos = s2.performance_obligations || [];
+  if (!pos.length) return '<p style="color:var(--gray-400);font-size:0.85rem;">No performance obligations identified.</p>';
+  let html = `<table class="result-table">
+    <thead><tr><th>#</th><th>Description</th><th>Product Type</th><th>Distinct?</th><th>Line Item Total</th><th>Rationale</th><th>ASC Ref</th></tr></thead><tbody>`;
+  pos.forEach((po, i) => {
+    const distinct = po.is_distinct !== false;
+    html += `<tr>
+      <td>${esc(po.id || String(i + 1))}</td>
+      <td>${esc(po.description || '')}</td>
+      <td>${esc(po.product_type || '')}</td>
+      <td><span class="badge ${distinct ? 'badge-yes' : 'badge-no'}">${distinct ? 'Yes' : 'No'}</span></td>
+      <td style="text-align:right;">${po.line_item_total != null ? formatCurrency(po.line_item_total) : '—'}</td>
+      <td style="font-size:0.78rem;color:var(--gray-500);">${esc(po.rationale || '')}</td>
+      <td style="font-size:0.75rem;color:var(--gray-400);">${esc(po.asc_reference || '')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// ─── Step 3: Transaction Price ────────────────────────────
+function renderStep3(s3) {
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:0.75rem;">';
+  html += `<div class="summary-item"><div class="item-label">Fixed Consideration</div><div class="item-value">${formatCurrency(s3.fixed_consideration || 0)}</div></div>`;
+  html += `<div class="summary-item"><div class="item-label">Variable Consideration</div><div class="item-value">${formatCurrency(s3.variable_consideration || 0)}</div></div>`;
+  html += '</div>';
+  html += `<div class="summary-item" style="margin-bottom:0.75rem;"><div class="item-label">Total Contract Value</div><div class="item-value" style="font-size:1.125rem;">${formatCurrency(s3.total_contract_value || 0)}</div></div>`;
+  const vcDetails = s3.variable_consideration_details || [];
+  if (vcDetails.length) {
+    html += '<div style="margin-top:0.5rem;">';
+    vcDetails.forEach(vc => {
+      html += `<div class="alert alert-info"><span class="alert-icon">ℹ️</span><div>
+        <strong>${esc(vc.component || '')}</strong>
+        ${vc.estimated_amount != null ? ' — Est. ' + formatCurrency(vc.estimated_amount) : ''}
+        ${vc.estimation_method ? ' (' + esc(vc.estimation_method) + ')' : ''}
+        ${vc.constraint_assessment ? '<br><span style="font-size:0.78rem;color:var(--gray-500);">Constraint: ' + esc(vc.constraint_assessment) + '</span>' : ''}
+      </div></div>`;
+    });
+    html += '</div>';
+  }
+  const sfc = s3.significant_financing_component || {};
+  if (sfc.present && sfc.detail) {
+    html += `<div class="alert alert-warning" style="margin-top:0.5rem;"><span class="alert-icon">⚠️</span><div><strong>Significant Financing Component:</strong> ${esc(sfc.detail)}</div></div>`;
+  }
+  const ascRefs = s3.asc_references || [];
+  if (ascRefs.length) {
+    html += '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--gray-400);">';
+    html += 'ASC References: ' + ascRefs.map(r => `<span class="ref">${esc(r)}</span>`).join(' ');
+    html += '</div>';
+  }
+  return html;
+}
+
+// ─── Step 4: Allocate Transaction Price ───────────────────
+function renderStep4(s4) {
+  const allocs = s4.allocations || [];
+  if (!allocs.length) return '<p style="color:var(--gray-400);font-size:0.85rem;">No allocations available.</p>';
+
+  let html = `<table class="result-table">
+    <thead><tr><th>Performance Obligation</th><th>SSP Approach</th><th>SSP Amount</th><th>Allocated Amount</th><th>%</th></tr></thead><tbody>`;
+  let totalAlloc = 0;
+  let hasEstimation = false;
+  let allWarnings = [];
+  allocs.forEach(a => {
+    totalAlloc += a.allocated_amount || 0;
+    const hasWarnings = (a.warnings && a.warnings.length > 0) || a.product_type === 'ai_governance';
+    if (hasWarnings) {
+      hasEstimation = true;
+      if (a.warnings) allWarnings = allWarnings.concat(a.warnings);
+    }
+    const rowClass = hasWarnings ? ' style="background:#fffbeb;"' : '';
+    const pct = (a.allocation_percentage != null ? (a.allocation_percentage * 100) : 0).toFixed(1);
+    html += `<tr${rowClass}>
+      <td>${esc(a.description || '')}${hasWarnings ? ' ⚠️' : ''}</td>
+      <td>${esc(a.ssp_estimation_approach || '')}</td>
+      <td style="text-align:right;">${formatCurrency(a.standalone_selling_price || 0)}</td>
+      <td style="text-align:right;font-weight:600;">${formatCurrency(a.allocated_amount || 0)}</td>
+      <td style="text-align:right;">${pct}%</td>
+    </tr>`;
+  });
+  html += `</tbody><tfoot><tr>
+    <td colspan="3" style="text-align:right;">Total Allocated</td>
+    <td style="text-align:right;">${formatCurrency(totalAlloc)}</td>
+    <td style="text-align:right;">100%</td>
+  </tr></tfoot></table>`;
+
+  if (hasEstimation) {
+    html += `<div class="ssp-warning">
+      <span class="warn-icon">⚠️</span>
+      <div class="warn-text">
+        <strong>SSP Estimation Required:</strong> One or more performance obligations (flagged above) lack directly observable standalone selling prices.
+        Under ASC 606-10-32-33, SSP must be estimated using one or more of:
+        <strong>(a) Adjusted Market Assessment</strong> — evaluate the market and estimate what customers would be willing to pay;
+        <strong>(b) Expected Cost Plus Margin</strong> — forecast expected costs plus an appropriate margin;
+        <strong>(c) Residual Approach</strong> — permitted when SSP is highly variable or uncertain.
+        <em>Management judgment and documentation are required. Consider engaging auditors early for novel products (e.g., AI Governance).</em>
+        ${allWarnings.length ? '<br><br><strong>Specific warnings:</strong><ul style="margin:0.25rem 0 0 1rem;">' + allWarnings.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul>' : ''}
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+// ─── Step 5: Recognize Revenue ────────────────────────────
+function renderStep5(s5) {
+  const items = s5.schedules || [];
+  if (!items.length) return '<p style="color:var(--gray-400);font-size:0.85rem;">No recognition details available.</p>';
+  const methodMap = { 'point_in_time': 'Point-in-Time', 'ratable': 'Over Time', 'usage_based': 'Usage-Based' };
+  let html = `<table class="result-table">
+    <thead><tr><th>Performance Obligation</th><th>Method</th><th>Period</th><th>Allocated Amount</th><th>Notes</th></tr></thead><tbody>`;
+  items.forEach(item => {
+    const method = methodMap[item.recognition_pattern] || item.recognition_pattern || '';
+    const period = (item.recognition_start && item.recognition_end) ? item.recognition_start + ' to ' + item.recognition_end : '—';
+    html += `<tr>
+      <td>${esc(item.description || '')}</td>
+      <td><span class="badge" style="background:${
+        method === 'Point-in-Time' ? '#dbeafe;color:#1e40af' :
+        method === 'Over Time' ? '#d1fae5;color:#065f46' :
+        '#fae8ff;color:#86198f'
+      }">${esc(method)}</span></td>
+      <td style="font-size:0.8rem;color:var(--gray-500);white-space:nowrap;">${esc(period)}</td>
+      <td style="text-align:right;font-weight:600;">${item.allocated_amount != null ? formatCurrency(item.allocated_amount) : '—'}</td>
+      <td style="font-size:0.8rem;color:var(--gray-500);">${esc(item.notes || '')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// ─── Revenue Schedule Table ───────────────────────────────
+function renderScheduleTable(schedule) {
+  const months = schedule.months || [];
+  const obligations = schedule.obligations || [];
+  const container = document.getElementById('scheduleTableContainer');
+
+  if (!months.length) { container.innerHTML = '<p style="color:var(--gray-400);font-size:0.85rem;">No schedule data.</p>'; return; }
+
+  let html = '<table class="result-table"><thead><tr><th>Month</th>';
+  obligations.forEach(o => { html += `<th style="text-align:right;">${esc(o.name)}</th>`; });
+  html += '<th style="text-align:right;">Total</th></tr></thead><tbody>';
+
+  const colTotals = new Array(obligations.length).fill(0);
+  let grandTotal = 0;
+
+  months.forEach(m => {
+    let rowTotal = 0;
+    html += `<tr><td style="white-space:nowrap;">${esc(m.label)}</td>`;
+    obligations.forEach((o, oi) => {
+      const val = m.values[o.name] || 0;
+      colTotals[oi] += val;
+      rowTotal += val;
+      html += `<td style="text-align:right;">${formatCurrency(val)}</td>`;
+    });
+    grandTotal += rowTotal;
+    html += `<td style="text-align:right;font-weight:600;">${formatCurrency(rowTotal)}</td></tr>`;
+  });
+
+  html += '</tbody><tfoot><tr><td style="font-weight:700;">Total</td>';
+  obligations.forEach((o, oi) => { html += `<td style="text-align:right;">${formatCurrency(colTotals[oi])}</td>`; });
+  html += `<td style="text-align:right;">${formatCurrency(grandTotal)}</td></tr></tfoot></table>`;
+
+  container.innerHTML = html;
+}
+
+// ─── Stacked Bar Chart ────────────────────────────────────
+function renderChart(schedule) {
+  const canvas = document.getElementById('revenueCanvas');
+  const ctx = canvas.getContext('2d');
+  const months = schedule.months || [];
+  const obligations = schedule.obligations || [];
+
+  if (!months.length || !obligations.length) return;
+
+  // High-DPI
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = rect.height;
+
+  // Compute max
+  let maxVal = 0;
+  months.forEach(m => {
+    let sum = 0;
+    obligations.forEach(o => { sum += m.values[o.name] || 0; });
+    if (sum > maxVal) maxVal = sum;
+  });
+  maxVal = maxVal * 1.15 || 1;
+
+  // Layout
+  const padL = 70, padR = 20, padT = 15, padB = 50;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const barW = Math.max(8, Math.min(40, (chartW / months.length) * 0.55));
+  const gap = chartW / months.length;
+
+  // Grid
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillStyle = '#9ca3af';
+  ctx.textAlign = 'right';
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padT + chartH - (chartH * i / gridLines);
+    const val = (maxVal * i / gridLines);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.fillText(formatCompact(val), padL - 8, y + 4);
+  }
+
+  // Bars
+  months.forEach((m, mi) => {
+    const x = padL + gap * mi + (gap - barW) / 2;
+    let stackY = padT + chartH;
+    obligations.forEach(o => {
+      const val = m.values[o.name] || 0;
+      const h = (val / maxVal) * chartH;
+      const color = o.color || PO_COLORS[o.name] || '#6b7280';
+      ctx.fillStyle = color;
+      roundedRectTop(ctx, x, stackY - h, barW, h, Math.min(3, barW / 4));
+      ctx.fill();
+      stackY -= h;
+    });
+    // X labels
+    ctx.fillStyle = '#9ca3af';
+    ctx.textAlign = 'center';
+    ctx.font = '10px Inter, sans-serif';
+    const label = m.label.length > 7 ? m.label.substring(0, 7) : m.label;
+    ctx.save();
+    ctx.translate(x + barW / 2, padT + chartH + 12);
+    ctx.rotate(-0.5);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  });
+
+  // Legend
+  const legend = document.getElementById('chartLegend');
+  legend.innerHTML = obligations.map(o => {
+    const c = o.color || PO_COLORS[o.name] || '#6b7280';
+    return `<div class="legend-item"><span class="legend-color" style="background:${c};"></span>${esc(o.name)}</div>`;
+  }).join('');
+}
+
+function roundedRectTop(ctx, x, y, w, h, r) {
+  if (h <= 0) return;
+  r = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function formatCompact(n) {
+  if (n >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'K';
+  return '$' + Math.round(n);
+}
+
+// ─── Warnings ─────────────────────────────────────────────
+function renderWarnings(flags) {
+  const container = document.getElementById('warningsContainer');
+  if (!flags.length) {
+    container.innerHTML = '<p style="color:var(--gray-400);font-size:0.85rem;">No warnings or flags.</p>';
+    return;
+  }
+  const severityMap = { 'high': 'error', 'medium': 'warning', 'low': 'info' };
+  container.innerHTML = flags.map(w => {
+    const type = severityMap[w.severity] || 'warning';
+    const icon = type === 'error' ? '🔴' : type === 'info' ? '🔵' : '🟡';
+    return `<div class="alert alert-${type}">
+      <span class="alert-icon">${icon}</span>
+      <div>${w.category ? '<strong>' + esc(w.category) + ':</strong> ' : ''}${esc(w.message || '')}${w.asc_reference ? `<span class="ref">${esc(w.asc_reference)}</span>` : ''}${w.action_required ? '<br><span style="font-size:0.78rem;color:var(--gray-500);">Action: ' + esc(w.action_required) + '</span>' : ''}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
