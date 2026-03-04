@@ -758,6 +758,9 @@
         <button class="btn btn-primary" id="uploadBtn" onclick="uploadPDF()" disabled>
           <span class="btn-text">Analyze Order Form</span>
         </button>
+        <button class="btn" style="margin-left:0.5rem;background:#6b7280;color:#fff;" id="debugBtn" onclick="debugUpload()" disabled>
+          <span class="btn-text">Debug PDF Text</span>
+        </button>
       </div>
     </div>
 
@@ -941,6 +944,7 @@ function setFile(file) {
   el.textContent = '📎 ' + file.name;
   el.classList.add('visible');
   document.getElementById('uploadBtn').disabled = false;
+  document.getElementById('debugBtn').disabled = false;
 }
 
 // ─── Line Items ───────────────────────────────────────────
@@ -1041,6 +1045,43 @@ async function uploadPDF() {
     } else {
       showToast('No analysis returned. Please try manual entry.', true);
     }
+  } catch (e) {
+    showToast(e.message, true);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ─── Debug Upload ─────────────────────────────────────────
+async function debugUpload() {
+  if (!selectedFile) return showToast('Select a PDF first.', true);
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  showLoading('Extracting PDF text…');
+  try {
+    const res = await fetch('/api/debug-upload', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    const r = document.getElementById('results');
+    r.classList.add('visible');
+    let html = '<div class="card" style="margin-bottom:1.5rem;"><h2 style="font-size:1.1rem;margin-bottom:1rem;">PDF Debug Output</h2>';
+    html += '<h3 style="font-size:0.95rem;margin-bottom:0.5rem;">Parsed Fields</h3>';
+    html += '<table class="result-table"><tbody>';
+    html += '<tr><td><strong>Account Name</strong></td><td>' + esc(data.parsed_account_name || '') + '</td></tr>';
+    html += '<tr><td><strong>Contact Name</strong></td><td>' + esc(data.parsed_contact_name || '') + '</td></tr>';
+    html += '<tr><td><strong>Contact Email</strong></td><td>' + esc(data.parsed_contact_email || '') + '</td></tr>';
+    html += '</tbody></table>';
+    html += '<h3 style="font-size:0.95rem;margin:1rem 0 0.5rem;">Bill To Section (extracted)</h3>';
+    html += '<pre style="background:#f1f5f9;padding:1rem;border-radius:6px;font-size:0.8rem;white-space:pre-wrap;max-height:200px;overflow:auto;">' + esc(data.bill_to_section || '(none found)') + '</pre>';
+    html += '<h3 style="font-size:0.95rem;margin:1rem 0 0.5rem;">Raw Extracted Text</h3>';
+    html += '<pre style="background:#f1f5f9;padding:1rem;border-radius:6px;font-size:0.75rem;white-space:pre-wrap;max-height:500px;overflow:auto;">' + esc(data.raw_text || '') + '</pre>';
+    html += '</div>';
+    document.getElementById('summaryGrid').innerHTML = '';
+    document.getElementById('accordionContainer').innerHTML = '';
+    document.getElementById('scheduleTableContainer').innerHTML = '';
+    document.getElementById('warningsContainer').innerHTML = '';
+    document.getElementById('chartLegend').innerHTML = '';
+    r.querySelector('.card') ? r.querySelector('.card').outerHTML = html : r.insertAdjacentHTML('afterbegin', html);
+    r.scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
     showToast(e.message, true);
   } finally {

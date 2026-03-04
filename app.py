@@ -277,6 +277,46 @@ def analyze_manual():
 
 
 # ---------------------------------------------------------------------------
+# Debug upload — shows raw text and parser output for troubleshooting
+# ---------------------------------------------------------------------------
+
+@app.route("/api/debug-upload", methods=["POST"])
+def debug_upload():
+    """Upload a PDF and return the raw extracted text plus parse diagnostics."""
+    from pdf_parser import (
+        extract_text_from_pdf,
+        _extract_bill_to_section,
+        _extract_customer_name,
+        _extract_contact_name,
+        _extract_email,
+    )
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file provided."}), 400
+
+        file = request.files["file"]
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = tmp.name
+            file.save(tmp_path)
+
+        try:
+            raw_text = extract_text_from_pdf(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        return jsonify({
+            "raw_text": raw_text,
+            "raw_text_lines": raw_text.split("\n"),
+            "bill_to_section": _extract_bill_to_section(raw_text),
+            "parsed_account_name": _extract_customer_name(raw_text),
+            "parsed_contact_name": _extract_contact_name(raw_text),
+            "parsed_contact_email": _extract_email(raw_text),
+        }), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
