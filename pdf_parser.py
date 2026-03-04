@@ -159,83 +159,144 @@ def _find_money_in_text(text: str, label: str) -> Optional[float]:
 
 def _extract_line_items_from_text(text: str) -> list[LineItem]:
     """
-    Attempt to parse line items from tabular text.
-    Looks for patterns like:
-        Description    Qty    Unit Price    Total
-        Software License   1   $50,000.00   $50,000.00
+    Extract line items from order form text.
+
+    Handles Coder order form formats where:
+      - Descriptions span multiple lines (e.g. 'Coder Premium - Agent\nReady Workspaces')
+      - Quantities have units (e.g. '1,300 Users', '10,000 Workspace Starts')
+      - Credits appear as negative amounts (e.g. '-$574,188.10')
+      - Subtotals end each line item row
     """
     items: list[LineItem] = []
 
-    # Pattern: description, then numbers for qty, unit price, total
-    # Flexible pattern to match common table rows
-    line_pattern = re.compile(
-        r"^(.+?)\s+"
-        r"(\d+)\s+"
-        r"\$?([\d,]+\.?\d*)\s+"
-        r"\$?([\d,]+\.?\d*)\s*$",
+    # --- Strategy 1: Find lines ending with a dollar amount (subtotal) ---
+    # These are the actual line-item rows in a Coder order form.
+    # Pattern: capture everything on a line that ends with a $amount
+    subtotal_line_re = re.compile(
+        r"^(.+?)\s+-?\$([\d,]+\.\d{2})\s*$",
         re.MULTILINE,
     )
 
-    for match in line_pattern.finditer(text):
-        desc = match.group(1).strip()
-        qty_str = match.group(2).strip()
-        unit_str = match.group(3).strip()
-        total_str = match.group(4).strip()
+    for match in subtotal_line_re.finditer(text):
+        raw_desc = match.group(1).strip()
+        subtotal_str = match.group(2).strip()
 
-        # Skip header rows
-        if any(
-            h in desc.lower()
-            for h in ["description", "item", "product", "qty", "quantity"]
-        ):
+        # Skip header rows, grand total, and non-product lines
+        desc_lower = raw_desc.lower()
+        if any(skip in desc_lower for skip in [
+            "description", "product", "quantity", "list price",
+            "grand total", "subtotal", "total",
+            "page ", "date", "terms", "signature",
+            "december", "january", "february", "march",
+            "april", "may", "june", "july", "august",
+            "september", "october", "november",
+            "envelope", "docusign",
+        ]):
             continue
 
-        qty = int(qty_str)
-        unit_price = _parse_money(unit_str)
-        total = _parse_money(total_str)
+        subtotal = _parse_money(subtotal_str)
+        if subtotal is None or subtotal <= 0:
+            continue
 
-        if unit_price is not None and total is not None:
-            product_type = _classify_product_type(desc)
-            items.append(
-                LineItem(
-                    description=desc,
-                    quantity=qty,
-                    unit_price=unit_price,
-                    total=total,
-                    product_type=product_type,
-                )
+        # Check if the original line had a negative sign (credit)
+        full_match_text = match.group(0)
+        is_credit = bool(re.search(r"-\$", full_match_text))
+
+        # Extract quantity from the description portion
+        # e.g. "Coder Premium (Year 1) 1,300 Users $1,200.00 $924.00"
+        qty = 1
+        qty_match = re.search(r"([\d,]+)\s*(?:Users|Workspace Starts|Starts|Seats|Licenses)", raw_desc, re.IGNORECASE)
+        if qty_match:
+            qty = int(qty_match.group(1).replace(",", ""))
+
+        # Clean the description: remove qty/price data, keep product name
+        clean_desc = raw_desc
+        # Remove trailing price columns (e.g. "$1,200.00 $924.00")
+        clean_desc = re.sub(r"\s+\$[\d,]+\.\d{2}(\s+\$[\d,]+\.\d{2})*\s*$", "", clean_desc)
+        # Remove quantity with units
+        clean_desc = re.sub(r"\s*[\d,]+\s*(?:Users|Workspace Starts|Starts|Seats|Licenses)\s*", " ", clean_desc, flags=re.IGNORECASE)
+        # Remove standalone numbers (e.g. leftover quantities)
+        clean_desc = re.sub(r"\s+[\d,]+\s*$", "", clean_desc)
+        # Remove price-like values
+        clean_desc = re.sub(r"\s*-\s*-\s*", " ", clean_desc)  # "- -" separators
+        clean_desc = re.sub(r"\s+", " ", clean_desc).strip()
+
+        if not clean_desc or len(clean_desc) < 3:
+            continue
+
+        unit_price = round(subtotal / qty, 2) if qty > 0 else subtotal
+        product_type = _classify_product_type(clean_desc)
+
+        items.append(
+            LineItem(
+                description=clean_desc,
+                quantity=qty,
+                unit_price=unit_price,
+                total=-subtotal if is_credit else subtotal,
+                product_type=product_type,
             )
-
-    # Fallback: try a simpler two-column pattern (description + total)
-    if not items:
-        simple_pattern = re.compile(
-            r"^(.+?)\s+\$?([\d,]+\.?\d*)\s*$",
-            re.MULTILINE,
         )
-        for match in simple_pattern.finditer(text):
-            desc = match.group(1).strip()
-            total_str = match.group(2).strip()
 
-            if any(
-                h in desc.lower()
-                for h in [
-                    "description", "total", "subtotal", "tax", "grand",
-                    "page", "date", "customer",
-                ]
-            ):
-                continue
+    # --- Post-processing: merge wrapped descriptions ---
+    # Check if lines immediately after a matched subtotal line contain
+    # additional description text (e.g. "Ready Workspaces Workspace Starts")
+    # that should be merged into the previous item's description.
+    text_lines = text.split("\n")
+    for item in items:
+        # Find which line this item came from
+        for idx, line in enumerate(text_lines):
+            if item.description in line and f"${item.total:,.2f}" in line.replace(",", ","):
+                # Check subsequent lines for continuation text
+                for next_idx in range(idx + 1, min(idx + 4, len(text_lines))):
+                    next_line = text_lines[next_idx].strip()
+                    # Stop if it looks like another product line or section
+                    if not next_line or re.match(r"^\d{2}/\d{2}/\d{4}", next_line):
+                        continue  # date lines between items, skip
+                    if re.search(r"\$[\d,]+\.\d{2}\s*$", next_line):
+                        break  # next subtotal line = new item
+                    if re.match(r"(?:Grand|Total|Terms|Contract|Page|Docusign)", next_line, re.IGNORECASE):
+                        break
+                    # This looks like continuation text
+                    # Check for keywords that indicate product context
+                    if any(kw in next_line.lower() for kw in [
+                        "workspace", "ready", "agent", "boundary",
+                        "bridge", "tasks", "mcp", "governance",
+                    ]):
+                        item.description = item.description + " " + next_line.split("(")[0].strip()
+                        # Re-classify with the full description
+                        item.product_type = _classify_product_type(item.description)
+                        # Re-extract quantity if we now see units
+                        qty_match = re.search(
+                            r"([\d,]+)\s*(?:Users|Workspace Starts|Starts|Seats|Licenses)",
+                            item.description + " " + next_line,
+                            re.IGNORECASE,
+                        )
+                        if not qty_match:
+                            # Also check: number on original line + unit on continuation
+                            # e.g. desc="Coder Premium - Agent 10,000" + next="Ready Workspaces Workspace Starts"
+                            combined = line + " " + next_line
+                            qty_match = re.search(
+                                r"([\d,]+)\s*(?:.*?)(?:Users|Workspace Starts|Starts|Seats|Licenses)",
+                                combined,
+                                re.IGNORECASE,
+                            )
+                        if qty_match:
+                            new_qty = int(qty_match.group(1).replace(",", ""))
+                            if new_qty > item.quantity:
+                                item.quantity = new_qty
+                                item.unit_price = round(item.total / new_qty, 2) if new_qty > 0 else item.total
+                break  # found the line, stop searching
 
-            total = _parse_money(total_str)
-            if total is not None and total > 0:
-                product_type = _classify_product_type(desc)
-                items.append(
-                    LineItem(
-                        description=desc,
-                        quantity=1,
-                        unit_price=total,
-                        total=total,
-                        product_type=product_type,
-                    )
-                )
+    # Clean up descriptions one more time after merging
+    for item in items:
+        item.description = re.sub(r"\s+[\d,]+\s*$", "", item.description).strip()
+        item.description = re.sub(r"\s+(?:Users|Workspace Starts|Starts|Seats|Licenses)\s*$", "", item.description, flags=re.IGNORECASE).strip()
+        item.description = re.sub(r"\s+", " ", item.description).strip()
+
+    # --- Post-processing: filter out credits for analysis purposes ---
+    # Keep credits in the list but flag them; the engine uses TCV from the total
+    # For now, only return positive-value items as the engine expects positive amounts
+    items = [li for li in items if li.total > 0]
 
     return items
 
@@ -450,11 +511,16 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
     # Dates
     order_date = (
         _find_date_in_text(text, "order date")
-        or _find_date_in_text(text, "date")
         or _find_date_in_text(text, "effective date")
         or _find_date_in_text(text, "execution date")
         or _find_date_in_text(text, "signature date")
     )
+    if not order_date:
+        # Fall back to contract start date if available
+        order_date = (
+            _find_date_in_text(text, "contract start")
+            or _find_date_in_text(text, "start date")
+        )
     if not order_date:
         order_date = date.today().isoformat()
         parse_warnings.append(
@@ -529,9 +595,21 @@ def _parse_text_to_order(text: str) -> tuple[Optional[OrderForm], list[str]]:
     payment_terms = _extract_text_field(text, "payment terms")
     if not payment_terms:
         payment_terms = _extract_text_field(text, "payment")
+    # Truncate at next label if multiple fields on same line
+    # e.g. "Net 30 Total Users: 2,800" -> "Net 30"
+    payment_terms = re.split(
+        r"\s+(?:Total|Billing|P\.?O|Users|Seats)",
+        payment_terms, flags=re.IGNORECASE,
+    )[0].strip()
+
     renewal_terms = _extract_text_field(text, "renewal terms")
     if not renewal_terms:
         renewal_terms = _extract_text_field(text, "renewal")
+
+    # Billing frequency
+    billing_freq = _extract_text_field(text, "billing frequency")
+    if not billing_freq:
+        billing_freq = _extract_text_field(text, "billing")
 
     try:
         order = OrderForm(
