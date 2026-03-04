@@ -248,15 +248,15 @@ def _extract_bill_to_section(text: str) -> str:
     """Extract the Bill To section from the order form text.
 
     Looks for a 'Bill To' header and captures everything until the next
-    major section header (e.g. 'Ship To', 'Sold To', 'Order Details',
-    'Products', 'Line Items', a horizontal rule, or a blank-line gap).
+    major section header (e.g. 'Product', 'Order Details', etc.).
+    Handles cases where 'Bill To' has no colon.
     """
+    # Try with optional colon / newline
     bill_to_pattern = re.search(
-        r"(?:bill\s*to|billing\s*(?:information|contact|address))"
-        r"\s*[:\-]?\s*\n(.*?)(?=\n\s*(?:"
+        r"bill\s*to\s*[:\-]?\s*\n(.*?)(?=\n\s*(?:"
         r"ship\s*to|sold\s*to|order\s*(?:details|summary|items)"
-        r"|products|line\s*items|description|prepared\s*by"
-        r"|authorized|signature|total"
+        r"|product|line\s*items|description|prepared\s*by"
+        r"|authorized|signature|total|quantity|list\s*price"
         r"|_{3,}|\-{3,}|={3,}"
         r")|\'\Z)",
         text,
@@ -265,10 +265,9 @@ def _extract_bill_to_section(text: str) -> str:
     if bill_to_pattern:
         return bill_to_pattern.group(1).strip()
 
-    # Broader fallback: grab the first 15 lines after "Bill To"
+    # Broader fallback: grab lines after "Bill To" until a section break
     simple = re.search(
-        r"(?:bill\s*to|billing\s*(?:information|contact))"
-        r"\s*[:\-]?\s*\n(.+)",
+        r"bill\s*to\s*[:\-]?\s*\n(.+)",
         text,
         re.IGNORECASE | re.DOTALL,
     )
@@ -281,9 +280,8 @@ def _extract_bill_to_section(text: str) -> str:
 def _extract_customer_name(text: str) -> str:
     """Extract Account Name from the order form.
 
-    Searches for an explicit 'Account Name:' label anywhere in the
-    document. Falls back to other common customer labels but
-    deliberately excludes 'Prepared By / Prepared For'.
+    Searches for an explicit 'Account Name:' label. Strips anything
+    after 'Prepared By' which may appear on the same line in PDFs.
     """
     patterns = [
         r"(?:account\s*name)\s*[:\-]?\s*(.+)",
@@ -294,6 +292,8 @@ def _extract_customer_name(text: str) -> str:
         if match:
             name = match.group(1).strip()
             name = name.split("\n")[0].strip()
+            # Remove 'Prepared By...' that may appear on the same line
+            name = re.split(r"\s+Prepared\s", name, flags=re.IGNORECASE)[0].strip()
             name = re.sub(r"\s*\d{1,2}/\d{1,2}/\d{2,4}.*", "", name).strip()
             if len(name) > 2:
                 return name
@@ -301,69 +301,115 @@ def _extract_customer_name(text: str) -> str:
 
 
 def _extract_contact_name(text: str) -> str:
-    """Extract contact name from the Bill To section of the order form."""
+    """Extract contact name from the Bill To section of the order form.
+
+    Handles multi-column PDF extraction where Name may appear without
+    a colon, e.g. 'Name Beverley Doyle Address: ...'.
+    """
     bill_to = _extract_bill_to_section(text)
 
     # --- Search within Bill To first ---
     if bill_to:
         bt_patterns = [
-            r"(?:contact\s*name|contact)\s*[:\-]?\s*(.+)",
-            r"(?:^|\n)\s*name\s*[:\-]\s*([A-Za-z][A-Za-z .\-']+)",
-            r"(?:attention|attn)\.?\s*[:\-]?\s*(.+)",
+            # "Name: Beverley Doyle" (with colon)
+            r"(?:contact\s*name|(?:^|\n)\s*name)\s*[:\-]\s*([A-Za-z][A-Za-z .\-']+)",
+            # "Name Beverley Doyle Address:" (no colon, multi-column merge)
+            # Capture word(s) after 'Name' up to next label like 'Address', 'Email', 'Phone' etc.
+            r"(?:^|\n|\s)Name\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*(?:Address|Email|Phone|Fax|$)",
+            # Attention/Attn
+            r"(?:attention|attn)\.?\s*[:\-]?\s*([A-Za-z][A-Za-z .\-']+)",
         ]
         for pat in bt_patterns:
-            match = re.search(pat, bill_to, re.IGNORECASE)
+            match = re.search(pat, bill_to, re.IGNORECASE | re.MULTILINE)
             if match:
                 name = match.group(1).strip().split("\n")[0].strip()
+                # Clean trailing labels/punctuation
+                name = re.split(r"\s+(?:Address|Email|Phone|Fax)", name, flags=re.IGNORECASE)[0].strip()
                 if len(name) > 2 and not re.match(r'^[\d$]', name):
                     return name
 
-    # --- Fallback: search full text (Bill To labels only) ---
+    # --- Fallback: search full text but only near Bill To ---
     full_patterns = [
-        r"bill\s*to\s*[:\-]?\s*(?:.*\n)*?\s*name\s*[:\-]\s*(.+)",
-        r"(?:contact\s*name)\s*[:\-]?\s*(.+)",
-        r"(?:attention|attn)\.?\s*[:\-]?\s*(.+)",
-        r"(?:^|\n)\s*name\s*[:\-]\s*([A-Za-z][A-Za-z .\-']+)",
+        r"bill\s*to\s*[:\-]?\s*(?:.*\n)*?\s*name\s*[:\-]?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+        r"(?:contact\s*name)\s*[:\-]?\s*([A-Za-z][A-Za-z .\-']+)",
+        r"(?:attention|attn)\.?\s*[:\-]?\s*([A-Za-z][A-Za-z .\-']+)",
     ]
     for pat in full_patterns:
         match = re.search(pat, text, re.IGNORECASE)
         if match:
             name = match.group(1).strip().split("\n")[0].strip()
+            name = re.split(r"\s+(?:Address|Email|Phone|Fax)", name, flags=re.IGNORECASE)[0].strip()
             if len(name) > 2 and not re.match(r'^[\d$]', name):
                 return name
     return ""
 
 
 def _extract_email(text: str) -> str:
-    """Extract contact email from the Bill To section of the order form."""
+    """Extract contact email from the Bill To section of the order form.
+
+    Handles multi-column PDF extraction where the email may be split
+    across lines, e.g.:
+        : qrt_ap@qube-
+        Email: rt.com
+    which should reconstruct to qrt_ap@qube-rt.com.
+    """
     email_re = r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
     bill_to = _extract_bill_to_section(text)
 
     # --- Search within Bill To first ---
     if bill_to:
-        # Labelled
+        # 1. Try a clean email in the Bill To section
         labelled = re.search(
             rf"(?:e-?mail)\s*[:\-]?\s*({email_re})",
             bill_to, re.IGNORECASE,
         )
         if labelled:
             return labelled.group(1).strip()
-        # Any email in the Bill To block
+
         any_bt = re.search(email_re, bill_to)
         if any_bt:
             return any_bt.group(0).strip()
 
-    # --- Fallback: labelled email in full text ---
-    labelled_full = re.search(
-        rf"(?:e-?mail)\s*[:\-]?\s*({email_re})",
-        text, re.IGNORECASE,
-    )
-    if labelled_full:
-        return labelled_full.group(1).strip()
-    # Last resort: first email in document
-    fallback = re.search(email_re, text)
-    if fallback:
-        return fallback.group(0).strip()
+        # 2. Handle split email: look for partial email patterns
+        #    e.g. lines containing "@" with a domain fragment on the next line,
+        #    or "Email:" label with a domain fragment that completes a prior "@" part
+        #    Real example from pdfplumber multi-column extraction:
+        #      Line: ": qrt_ap@qube- London Greater"
+        #      Line: "Email: rt.com London"
+        #    Should reconstruct: qrt_ap@qube-rt.com
+        bt_lines = bill_to.split("\n")
+        partial_user = None
+        for line in bt_lines:
+            stripped = line.strip()
+            # Look for a fragment containing @ (e.g. "qrt_ap@qube-" anywhere in the line)
+            at_match = re.search(r"([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]*-)", stripped)
+            if at_match:
+                partial_user = at_match.group(1)  # e.g. "qrt_ap@qube-"
+                continue
+            # If we have a partial, look for the domain completion on a subsequent line
+            if partial_user:
+                # e.g. "Email: rt.com London" or just "rt.com"
+                domain_match = re.search(
+                    r"(?:e-?mail\s*[:\-]?\s*)?([A-Za-z0-9][A-Za-z0-9.\-]*\.[A-Za-z]{2,})",
+                    stripped, re.IGNORECASE,
+                )
+                if domain_match:
+                    reconstructed = partial_user + domain_match.group(1)
+                    if re.match(email_re, reconstructed):
+                        return reconstructed
+                partial_user = None  # reset if we can't match
+
+    # --- Fallback: search full text but EXCLUDE 'Prepared By' emails ---
+    # Find all emails, skip ones near "Prepared By"
+    for m in re.finditer(email_re, text):
+        # Check if this email is on the same line as "Prepared By"
+        start = max(0, m.start() - 100)
+        context = text[start:m.start()]
+        if re.search(r"prepared\s+by", context, re.IGNORECASE):
+            continue
+        return m.group(0).strip()
+
+    return ""
     return ""
 
 
