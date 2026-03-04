@@ -244,18 +244,55 @@ def _extract_line_items_from_text(text: str) -> list[LineItem]:
 # Main extraction from text
 # ---------------------------------------------------------------------------
 
+def _extract_bill_to_section(text: str) -> str:
+    """Extract the Bill To section from the order form text.
+
+    Looks for a 'Bill To' header and captures everything until the next
+    major section header (e.g. 'Ship To', 'Sold To', 'Order Details',
+    'Products', 'Line Items', a horizontal rule, or a blank-line gap).
+    """
+    bill_to_pattern = re.search(
+        r"(?:bill\s*to|billing\s*(?:information|contact|address))"
+        r"\s*[:\-]?\s*\n(.*?)(?=\n\s*(?:"
+        r"ship\s*to|sold\s*to|order\s*(?:details|summary|items)"
+        r"|products|line\s*items|description|prepared\s*by"
+        r"|authorized|signature|total"
+        r"|_{3,}|\-{3,}|={3,}"
+        r")|\'\Z)",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if bill_to_pattern:
+        return bill_to_pattern.group(1).strip()
+
+    # Broader fallback: grab the first 15 lines after "Bill To"
+    simple = re.search(
+        r"(?:bill\s*to|billing\s*(?:information|contact))"
+        r"\s*[:\-]?\s*\n(.+)",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if simple:
+        lines = simple.group(1).strip().split("\n")[:15]
+        return "\n".join(lines)
+    return ""
+
+
 def _extract_customer_name(text: str) -> str:
-    """Try to extract customer/account name from the text."""
+    """Extract Account Name from the order form.
+
+    Searches for an explicit 'Account Name:' label anywhere in the
+    document. Falls back to other common customer labels but
+    deliberately excludes 'Prepared By / Prepared For'.
+    """
     patterns = [
         r"(?:account\s*name)\s*[:\-]?\s*(.+)",
-        r"(?:customer|client|bill\s*to|sold\s*to|company)\s*(?:name)?\s*[:\-]?\s*(.+)",
-        r"(?:prepared\s+for|order\s+for)\s*[:\-]?\s*(.+)",
+        r"(?:customer\s*name|company\s*name)\s*[:\-]?\s*(.+)",
     ]
     for pat in patterns:
         match = re.search(pat, text, re.IGNORECASE)
         if match:
             name = match.group(1).strip()
-            # Clean up — take only first line, remove trailing dates/numbers
             name = name.split("\n")[0].strip()
             name = re.sub(r"\s*\d{1,2}/\d{1,2}/\d{2,4}.*", "", name).strip()
             if len(name) > 2:
@@ -264,37 +301,67 @@ def _extract_customer_name(text: str) -> str:
 
 
 def _extract_contact_name(text: str) -> str:
-    """Try to extract the contact name from the text."""
-    # Match 'Name:' but avoid 'Account Name:', 'Customer Name:', etc.
-    patterns = [
+    """Extract contact name from the Bill To section of the order form."""
+    bill_to = _extract_bill_to_section(text)
+
+    # --- Search within Bill To first ---
+    if bill_to:
+        bt_patterns = [
+            r"(?:contact\s*name|contact)\s*[:\-]?\s*(.+)",
+            r"(?:^|\n)\s*name\s*[:\-]\s*([A-Za-z][A-Za-z .\-']+)",
+            r"(?:attention|attn)\.?\s*[:\-]?\s*(.+)",
+        ]
+        for pat in bt_patterns:
+            match = re.search(pat, bill_to, re.IGNORECASE)
+            if match:
+                name = match.group(1).strip().split("\n")[0].strip()
+                if len(name) > 2 and not re.match(r'^[\d$]', name):
+                    return name
+
+    # --- Fallback: search full text (Bill To labels only) ---
+    full_patterns = [
+        r"bill\s*to\s*[:\-]?\s*(?:.*\n)*?\s*name\s*[:\-]\s*(.+)",
         r"(?:contact\s*name)\s*[:\-]?\s*(.+)",
-        r"(?:^|\n)\s*name\s*[:\-]\s*(.+)",
-        r"(?:prepared\s+by|submitted\s+by|ordered\s+by)\s*[:\-]?\s*(.+)",
+        r"(?:attention|attn)\.?\s*[:\-]?\s*(.+)",
+        r"(?:^|\n)\s*name\s*[:\-]\s*([A-Za-z][A-Za-z .\-']+)",
     ]
-    for pat in patterns:
+    for pat in full_patterns:
         match = re.search(pat, text, re.IGNORECASE)
         if match:
             name = match.group(1).strip().split("\n")[0].strip()
-            # Filter out things that look like non-names
             if len(name) > 2 and not re.match(r'^[\d$]', name):
                 return name
     return ""
 
 
 def _extract_email(text: str) -> str:
-    """Try to extract an email address near a label, or the first email found."""
-    # Labelled email
-    labelled = re.search(
-        r"(?:e-?mail)\s*[:\-]?\s*([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})",
-        text, re.IGNORECASE
+    """Extract contact email from the Bill To section of the order form."""
+    email_re = r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
+    bill_to = _extract_bill_to_section(text)
+
+    # --- Search within Bill To first ---
+    if bill_to:
+        # Labelled
+        labelled = re.search(
+            rf"(?:e-?mail)\s*[:\-]?\s*({email_re})",
+            bill_to, re.IGNORECASE,
+        )
+        if labelled:
+            return labelled.group(1).strip()
+        # Any email in the Bill To block
+        any_bt = re.search(email_re, bill_to)
+        if any_bt:
+            return any_bt.group(0).strip()
+
+    # --- Fallback: labelled email in full text ---
+    labelled_full = re.search(
+        rf"(?:e-?mail)\s*[:\-]?\s*({email_re})",
+        text, re.IGNORECASE,
     )
-    if labelled:
-        return labelled.group(1).strip()
-    # Fallback: first email in document
-    fallback = re.search(
-        r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}",
-        text
-    )
+    if labelled_full:
+        return labelled_full.group(1).strip()
+    # Last resort: first email in document
+    fallback = re.search(email_re, text)
     if fallback:
         return fallback.group(0).strip()
     return ""
